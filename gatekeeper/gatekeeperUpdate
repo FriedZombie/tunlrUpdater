@@ -1,0 +1,101 @@
+#!/bin/sh
+
+user='user@example.com'		#user name to login into gatekeeper
+password='pass12345'		#password to login into gatekeeper
+
+agent='update-script'		#user agent string send to the server
+cookie='/tmp/tunlr-cookie.txt'	#create cookie jar
+insecure=1			#set insecure=1 to skip the cert validity check
+wOpt=''				#extra options for wget
+logCmdErr=''			#specify the command to pipe the error messages to, e.g. logger
+logCmd=''			#specify the commant to pipe the log messages to, e.g. logger
+
+#function to echo to stderr and exit the script
+errExit() {
+	if [ -z "${logCmdErr}" ]; then
+		echo "${1}" 1>&2
+	else
+		echo "${1}"
+		echo "${1}" | ${logCmdErr}
+	fi
+	exit 1
+}
+
+#function to log messages
+msgLog() {
+	echo "${1}"
+	[ -z "${logCmd}" ] || echo "${1}" | ${logCmd}
+}
+
+#function to url encode for those pesky secure passwords :P
+enc() {
+	echo "${1}" | sed \
+	  -e 's/%/%25/g' -e 's/ /%20/g' -e 's/!/%21/g' -e 's/"/%22/g' -e 's/#/%23/g' \
+	  -e 's/\$/%24/g' -e 's/\&/%26/g' -e 's/'\''/%27/g' -e 's/(/%28/g' -e 's/)/%29/g' \
+	  -e 's/\*/%2a/g' -e 's/+/%2b/g' -e 's/,/%2c/g' -e 's/-/%2d/g' -e 's/\./%2e/g' \
+	  -e 's/\//%2f/g' -e 's/:/%3a/g' -e 's/;/%3b/g' -e 's//%3e/g' -e 's/?/%3f/g' \
+	  -e 's/@/%40/g' -e 's/\[/%5b/g' -e 's/\\/%5c/g' -e 's/\]/%5d/g' -e 's/\^/%5e/g' \
+	  -e 's/_/%5f/g' -e 's/`/%60/g' -e 's/{/%7b/g' -e 's/|/%7c/g' -e 's/}/%7d/g' -e 's/~/%7e/g'
+}
+
+#function to get the needed web pages
+gPage() {
+	case $# in
+	  3)
+		wget ${wOpt} --load-cookies "${cookie}" --save-cookies "${cookie}" --keep-session-cookies --user-agent "${agent}" --referer "${2}" --post-data "${3}" -O - "${1}"
+		return $?
+	  ;;
+	  2)
+		wget ${wOpt} --load-cookies "${cookie}" --save-cookies "${cookie}" --keep-session-cookies --user-agent "${agent}" --referer "${2}" -O - "${1}"
+		return $?
+	  ;;
+	  *)
+		wget ${wOpt} --load-cookies "${cookie}" --save-cookies "${cookie}" --keep-session-cookies --user-agent "${agent}" -O - "${1}"
+		return $?	
+	esac
+}
+
+# Test if we have wget and see if we have a useable one
+wgetInfo=`wget --no-check-certificate 2>&1`
+[ $? -eq 127 ] && errExit "wget seems to be missing"
+echo "${wgetInfo}" | grep 'BusyBox' > /dev/null && errExit "wget provided by BusyBox isn't sufficient"
+echo "${wgetInfo}" | grep 'unrecognized option' > /dev/null && errExit "wget is compiled without HTTPS support"
+
+#openwrt doesn't have certs installed by default, hence the insecure option
+[ "${insecure}" = "1" ] && wOpt="${wOpt} --no-check-certificate"
+
+touch "${cookie}"
+
+msgLog "Getting gatekeeper cookies and form_token"
+form=`gPage 'https://gatekeeper.tunlr.net' | sed -n '/<form/,/<\/form/p' | tr '\n' ' '`
+[ -z "${form}" ] && errExit "Failed to retrieve the login form data"
+
+form_token=`echo "${form}" | sed 's/.*form_token" value\="//;s/".*//'`
+[ -z "${form_token}" ] && errExit "failed to retrieve the login form_token"
+
+msgLog "Sending credentials to the gatekeeper login"
+dashboard=`gPage "https://gatekeeper.tunlr.net/login" \
+  "https://gatekeeper.tunlr.net" \
+  "form_token=$(enc "${form_token}")&usermail=$(enc "${user}")&password=$(enc "${password}")"`
+
+echo "${dashboard}" | grep 'password is incorrect' > /dev/null && errExit 'Your username/email or password is incorrect'
+echo "${dashboard}" | grep 'name="chk_rememberme"' > /dev/null && errExit 'failed to login, credentials seems to be correct though'
+
+msgLog "Login successful, checking the current status"
+[ `echo "${dashboard}" | grep 'fa-check-square-o' | grep -Eoi 'Active|Valid' | wc -w` -lt 5 ] && errExit "Check the tunlr dashboard, something is wrong"
+
+echo "${dashboard}" | grep '/dashboard/change_ip' > /dev/null
+if [ $? -eq 0 ]; then
+	msgLog "ip has changed, going to update"
+	echo ""
+	dashboard=`gPage 'https://gatekeeper.tunlr.net/dashboard/change_ip' 'https://gatekeeper.tunlr.net/dashboard'`
+	echo "${dashboard}" | grep 'name="chk_rememberme"' > /dev/null && errExit "ip update has failed, we seemed to have been kicked out"
+	echo "${dashboard}" | grep '/dashboard/change_ip' && errExit "ip update has failed"
+	[ `echo "${dashboard}" | grep 'fa-check-square-o' | grep -Eoi 'Active|Valid' | wc -w` -lt 5 ] && errExit 'Check the tunlr dashboard, something is wrong'
+	msgLog "Ip address has been updated, everything is ok!"
+else
+	echo ""
+	msgLog "Nothing to update, everything is ok!"
+fi
+
+

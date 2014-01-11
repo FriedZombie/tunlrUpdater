@@ -1,0 +1,28 @@
+#!/bin/sh
+
+netIface="wan"					#network interface to use
+lockFile="/var/run/gatekeeperUpdate.lock"	#the lockfile
+ipFile="/tmp/gatekeeperIp.txt"			#file to store the ip in
+
+if [ "$ACTION" = "ifup" ] && [ "$INTERFACE" = "${netIface}" ]; then
+	{
+		. /lib/functions/network.sh;
+		if [ ! -f "${lockFile}" ]; then
+			touch "${lockFile}"
+			sleep 15
+			ip=''
+			network_get_ipaddr ip "${netIface}"
+			if [ -z "${ip}" ]; then
+				rm "${lockFile}"
+				return 0
+			fi
+			echo "${ip}" | grep -E '^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.)' && :> "${ipFile}" || touch "${ipFile}"
+			touch "${ipFile}"
+			grep "${ip}" "${ipFile}" > /dev/null
+			if [ $? -ne 0 ]; then
+				/sbin/gatekeeperUpdate && echo "${ip}" > "${ipFile}"
+			fi
+			rm "${lockFile}"
+		fi
+	}&
+fi
