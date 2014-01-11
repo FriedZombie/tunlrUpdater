@@ -20,7 +20,7 @@ if [ $? -eq 127 ]; then
 	exit 1
 fi
 
-if [ -z "${inst}" ] && inst=`opkg list-installed curl`
+[ -z "${inst}" ] && inst=`opkg list-installed curl`
 
 if [ -z "${inst}" ]; then
 	inst=`opkg list-installed wget-nossl`
