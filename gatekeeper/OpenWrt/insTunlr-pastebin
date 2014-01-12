@@ -59,7 +59,7 @@ fi
 tmpFile=`mktemp`
 
 #get and load the rest from the script from the git repo
-if [ "client" = "wget" ]; then
+if [ "$client" = "wget" ]; then
 	wget --no-check-certificate -O "${tmpFile}" "https://raw.github.com/FriedZombie/tunlrUpdater/master/gatekeeper/OpenWrt/insTunlr-git"
 else
 	curl --insecure --output "${tmpFile}" "https://raw.github.com/FriedZombie/tunlrUpdater/master/gatekeeper/OpenWrt/insTunlr-git"
