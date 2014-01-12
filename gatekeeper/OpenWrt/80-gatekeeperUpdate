@@ -16,7 +16,7 @@ if [ "$ACTION" = "ifup" ] && [ "$INTERFACE" = "${netIface}" ]; then
 				rm "${lockFile}"
 				return 0
 			fi
-			echo "${ip}" | grep -E '^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.)' && :> "${ipFile}" || touch "${ipFile}"
+			echo "${ip}" | grep -E '^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.)' && echo "$(wget -q http://bot.whatismyipaddress.com -O -)" > "${ipFile}" || touch "${ipFile}"
 			touch "${ipFile}"
 			grep "${ip}" "${ipFile}" > /dev/null
 			if [ $? -ne 0 ]; then
