@@ -23,9 +23,10 @@ fi
 client="wget"
 if [ ! -z "${inst}" ]; then
 	cTest=`mktemp`
+	rm "${cTest}"
 	echo "curl is found, going to test if it stores cookies"
 	curl --location --insecure --cookie-jar "${cTest}" "https://www.google.com" > /dev/null
-	if [ -s "${cTest}" ]; then
+	if [ -f "${cTest}" ]; then
 		echo "curl found, no cookies are stored :/"
 		echo "for the gatekeeper login, cookies are required"
 		echo "wget is a good alternative"

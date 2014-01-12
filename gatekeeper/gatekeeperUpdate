@@ -88,7 +88,7 @@ gPage() {
 
 	fi
 	[ $ex -ne 0 ] && errExit "Getting the page has failed"
-	[ -s "${cookie}" ] || errExit "Cookies not stored, check script settings"
+	[ -f "${cookie}" ] || errExit "Cookies not stored, check script settings"
 	return 0
 }
 
