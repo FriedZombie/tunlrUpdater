@@ -26,9 +26,9 @@ if [ ! -z "${inst}" ]; then
 	rm "${cTest}"
 	echo "curl is found, going to test if it stores cookies"
 	curl --location --insecure --cookie-jar "${cTest}" "https://www.google.com" > /dev/null
-	if [ -f "${cTest}" ]; then
+	if [ ! -s "${cTest}" ]; then
 		echo "curl found, no cookies are stored :/"
-		echo "for the gatekeeper login, cookies are required"
+		echo "for the gatekeeper login are cookies required"
 		echo "wget is a good alternative"
 	else
 		echo "going to use curl as client!"
@@ -36,7 +36,7 @@ if [ ! -z "${inst}" ]; then
 	fi
 fi
 
-[ "${client}" = wget ] && inst=`opkg list-installed wget`
+[ "${client}" = "wget" ] && inst=`opkg list-installed wget`
 
 if [ -z "${inst}" ]; then
 	inst=`opkg list-installed wget-nossl`
