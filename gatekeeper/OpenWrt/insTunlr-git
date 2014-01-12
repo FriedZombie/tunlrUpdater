@@ -1,9 +1,13 @@
 scriptLocation='https://raw.github.com/FriedZombie/tunlrUpdater/master/gatekeeper/gatekeeperUpdate'
 hotplugLocation='https://raw.github.com/FriedZombie/tunlrUpdater/master/gatekeeper/OpenWrt/80-gatekeeperUpdate'
 
-tScr=`wget --no-check-certificate -O - "${scriptLocation}"` || exit 1
-hScr=`wget --no-check-certificate -O - "${hotplugLocation}"` || exit 1
-
+if [ "${agent}" = wget ]; then
+	tScr=`wget --no-check-certificate -O - "${scriptLocation}"` || exit 1
+	hScr=`wget --no-check-certificate -O - "${hotplugLocation}"` || exit 1
+else
+        tScr=`curl --insecure "${scriptLocation}"` || exit 1
+        hScr=`curl --insecure "${hotplugLocation}"` || exit 1
+fi
 echo ""
 echo $'\nFill out the credentials for tunlr gatekeeper.\nThey will be stored locally in the script\n'
 
