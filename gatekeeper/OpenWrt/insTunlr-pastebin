@@ -14,11 +14,28 @@ isOk() {
 
 q="opkg update"
 echo "Checking if wget is installed"
-inst=`opkg list-installed wget`
+inst=`opkg list-installed curl`
 if [ $? -eq 127 ]; then
 	echo "Are you sure this is OpenWrt?, opkg isn't found" 1>&2
 	exit 1
 fi
+
+client="wget"
+if [ ! -z "${inst}" ]; then
+	cTest=`mktemp`
+	echo "curl is found, going to test if it stores cookies"
+	curl --cookie-jar "${cTest}" "https://www.google.com"
+	if [ -s "${cTest}" ]; then
+		echo "curl found, no cookies are stored :/"
+		echo "for the gatekeeper login, cookies are required"
+		echo "wget is a good alternative"
+	else
+		echo "going to use curl as client!"
+		client="curl"
+	fi
+fi
+
+[ "${client}" = wget ] && inst=`opkg list-installed wget`
 
 if [ -z "${inst}" ]; then
 	inst=`opkg list-installed wget-nossl`
@@ -41,7 +58,11 @@ fi
 tmpFile=`mktemp`
 
 #get and load the rest from the script from the git repo
-wget --no-check-certificate -O "${tmpFile}" "https://raw.github.com/FriedZombie/tunlrUpdater/master/gatekeeper/OpenWrt/insTunlr-git"
+if [ "client" = "wget" ]; then
+	wget --no-check-certificate -O "${tmpFile}" "https://raw.github.com/FriedZombie/tunlrUpdater/master/gatekeeper/OpenWrt/insTunlr-git"
+else
+	curl --insecure --output "${tmpFile}" "https://raw.github.com/FriedZombie/tunlrUpdater/master/gatekeeper/OpenWrt/insTunlr-git"
+fi
 
 if [ $? -ne 0 ]; then
 	echo "Downloading the second part of the script has failed"

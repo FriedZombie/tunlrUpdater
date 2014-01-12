@@ -16,7 +16,8 @@ echo "/sbin/gatekeeperUpdate"
 
 echo "${tScr}" | sed "s/user@example\.com/${user}/;s/pass12345/${pass}/;
   s/logCmdErr=''/logCmdErr='logger -t tunlr -p daemon.error'/;
-  s/logCmd=''/logCmd='logger -t tunlr -p daemon.info'/" > /sbin/gatekeeperUpdate
+  s/logCmd=''/logCmd='logger -t tunlr -p daemon.info'/;
+  s/'wget'/'${agent}'/" > /sbin/gatekeeperUpdate
 
 chmod +x /sbin/gatekeeperUpdate
 
