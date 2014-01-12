@@ -1,7 +1,7 @@
 scriptLocation='https://raw.github.com/FriedZombie/tunlrUpdater/master/gatekeeper/gatekeeperUpdate'
 hotplugLocation='https://raw.github.com/FriedZombie/tunlrUpdater/master/gatekeeper/OpenWrt/80-gatekeeperUpdate'
 
-if [ "${agent}" = wget ]; then
+if [ "${client}" = wget ]; then
 	tScr=`wget --no-check-certificate -O - "${scriptLocation}"` || exit 1
 	hScr=`wget --no-check-certificate -O - "${hotplugLocation}"` || exit 1
 else
@@ -21,7 +21,7 @@ echo "/sbin/gatekeeperUpdate"
 echo "${tScr}" | sed "s/user@example\.com/${user}/;s/pass12345/${pass}/;
   s/logCmdErr=''/logCmdErr='logger -t tunlr -p daemon.error'/;
   s/logCmd=''/logCmd='logger -t tunlr -p daemon.info'/;
-  s/'wget'/'${agent}'/" > /sbin/gatekeeperUpdate
+  s/'wget'/'${client}'/" > /sbin/gatekeeperUpdate
 
 chmod +x /sbin/gatekeeperUpdate
 
