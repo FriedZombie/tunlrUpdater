@@ -1,14 +1,25 @@
 #!/bin/sh
 
+####################
+## -- Settings -- ##
+####################
+
 user='user@example.com'		#user name to login into gatekeeper
 password='pass12345'		#password to login into gatekeeper
 
+client='wget'			#client to use, options: curl wget
 agent='update-script'		#user agent string send to the server
 cookie='/tmp/tunlr-cookie.txt'	#create cookie jar
 insecure=1			#set insecure=1 to skip the cert validity check
 wOpt=''				#extra options for wget
+cOpt=''				#extra options for curl
 logCmdErr=''			#specify the command to pipe the error messages to, e.g. logger
 logCmd=''			#specify the commant to pipe the log messages to, e.g. logger
+
+
+#############################
+## -- Script start here -- ##
+#############################
 
 #function to echo to stderr and exit the script
 errExit() {
@@ -40,32 +51,70 @@ enc() {
 
 #function to get the needed web pages
 gPage() {
-	case $# in
-	  3)
-		wget ${wOpt} --load-cookies "${cookie}" --save-cookies "${cookie}" --keep-session-cookies --user-agent "${agent}" --referer "${2}" --post-data "${3}" -O - "${1}"
-		return $?
-	  ;;
-	  2)
-		wget ${wOpt} --load-cookies "${cookie}" --save-cookies "${cookie}" --keep-session-cookies --user-agent "${agent}" --referer "${2}" -O - "${1}"
-		return $?
-	  ;;
-	  *)
-		wget ${wOpt} --load-cookies "${cookie}" --save-cookies "${cookie}" --keep-session-cookies --user-agent "${agent}" -O - "${1}"
-		return $?	
-	esac
+	if [ "$client" = "wget" ]; then
+		case $# in
+		  3)
+			wget ${wOpt} --load-cookies "${cookie}" --save-cookies "${cookie}" --keep-session-cookies \
+			  --user-agent "${agent}" --referer "${2}" --post-data "${3}" -O - "${1}"
+			ex=$?
+		  ;;
+		  2)
+			wget ${wOpt} --load-cookies "${cookie}" --save-cookies "${cookie}" \
+			  --keep-session-cookies --user-agent "${agent}" --referer "${2}" -O - "${1}"
+			ex=$?
+		  ;;
+		  *)
+			wget ${wOpt} --load-cookies "${cookie}" --save-cookies "${cookie}" \
+			  --keep-session-cookies --user-agent "${agent}" -O - "${1}"
+			ex=$?
+		esac
+	else
+		case $# in
+		  3)
+			curl ${cOpt} --cookie "${cookie}" --cookie-jar "${cookie}" --location \
+			  --user-agent "${agent}" --referer "${2}" --data "${3}" "${1}"
+			ex=$?
+		  ;;
+		  2)
+			curl ${cOpt} --cookie "${cookie}" --cookie-jar "${cookie}" --location \
+			  --user-agent "${agent}" --referer "${2}" "${1}"
+			ex=$?
+		  ;;
+		  *)
+			curl ${cOpt} --cookie "${cookie}" --cookie-jar "${cookie}" --location \
+			  --user-agent "${agent}" "${1}"
+			ex=$?
+		esac
+
+	fi
+	[ $ex -ne 0 ] && errExit "Getting the page has failed"
+	[ -f "${cookie}" ] || errExit "Cookies not stored, check script settings"
+	return 0
 }
 
 # Test if we have wget and see if we have a useable one
-wgetInfo=`wget --no-check-certificate 2>&1`
-[ $? -eq 127 ] && errExit "wget seems to be missing"
-echo "${wgetInfo}" | grep 'BusyBox' > /dev/null && errExit "wget provided by BusyBox isn't sufficient"
-echo "${wgetInfo}" | grep 'unrecognized option' > /dev/null && errExit "wget is compiled without HTTPS support"
+case $client in
+  "wget")
+	wgetInfo=`wget --no-check-certificate 2>&1`
+	[ $? -eq 127 ] && errExit "wget seems to be missing"
+	echo "${wgetInfo}" | grep 'BusyBox' > /dev/null && errExit "wget provided by BusyBox isn't sufficient"
+	echo "${wgetInfo}" | grep 'unrecognized option' > /dev/null && errExit "wget is compiled without HTTPS support"
+  ;;
+  "curl")
+	curlInfo=`curl --version`
+	[ $? -eq 127 ] && errExit "curl seems to be missing"
+	echo "${curlInfo}" | grep 'https' > /dev/null || errExit "curl is compiled without HTTPS support"
+	echo "${curlInfo}" | grep 'zlib'> /dev/null && cOpt="${cOpt} --compressed"
+  ;;
+  *)
+	errExit "Incorrect client specified in script"
+esac
 
 #openwrt doesn't have certs installed by default, hence the insecure option
-[ "${insecure}" = "1" ] && wOpt="${wOpt} --no-check-certificate"
-
-touch "${cookie}"
-
+if [ "${insecure}" = "1" ]; then
+	wOpt="${wOpt} --no-check-certificate"
+	cOpt="${cOpt} --insecure"
+fi
 msgLog "Getting gatekeeper cookies and form_token"
 form=`gPage 'https://gatekeeper.tunlr.net' | sed -n '/<form/,/<\/form/p' | tr '\n' ' '`
 [ -z "${form}" ] && errExit "Failed to retrieve the login form data"
@@ -78,6 +127,7 @@ dashboard=`gPage "https://gatekeeper.tunlr.net/login" \
   "https://gatekeeper.tunlr.net" \
   "form_token=$(enc "${form_token}")&usermail=$(enc "${user}")&password=$(enc "${password}")"`
 
+[ -z "${dashboard}" ] && errExit 'gatekeeper returned an empty page'
 echo "${dashboard}" | grep 'password is incorrect' > /dev/null && errExit 'Your username/email or password is incorrect'
 echo "${dashboard}" | grep 'name="chk_rememberme"' > /dev/null && errExit 'failed to login, credentials seems to be correct though'
 
@@ -97,5 +147,3 @@ else
 	echo ""
 	msgLog "Nothing to update, everything is ok!"
 fi
-
-
