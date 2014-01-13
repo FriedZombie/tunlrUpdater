@@ -128,8 +128,9 @@ dashboard=`gPage "https://gatekeeper.tunlr.net/login" \
   "form_token=$(enc "${form_token}")&usermail=$(enc "${user}")&password=$(enc "${password}")"`
 
 [ -z "${dashboard}" ] && errExit 'gatekeeper returned an empty page'
-echo "${dashboard}" | grep 'password is incorrect' > /dev/null && errExit 'Your username/email or password is incorrect'
-echo "${dashboard}" | grep 'name="chk_rememberme"' > /dev/null && errExit 'failed to login, credentials seems to be correct though'
+echo "${dashboard}" | grep -i 'password is incorrect' > /dev/null && errExit 'Your username/email or password is incorrect'
+echo "${dashboard}" | grep    'name="chk_rememberme"' > /dev/null && errExit 'failed to login, credentials seems to be correct though'
+echo "${dashboard}" | grep -i 'Account number' > /dev/null || errExit 'Failed to get the dashboard page'
 
 msgLog "Login successful, checking the current status"
 [ `echo "${dashboard}" | grep 'fa-check-square-o' | grep -Eoi 'Active|Valid' | wc -w` -lt 5 ] && errExit "Check the tunlr dashboard, something is wrong"
