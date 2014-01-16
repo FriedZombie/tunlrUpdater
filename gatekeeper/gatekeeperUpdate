@@ -141,7 +141,7 @@ if [ $? -eq 0 ]; then
 	echo ""
 	dashboard=`gPage 'https://gatekeeper.tunlr.net/dashboard/change_ip' 'https://gatekeeper.tunlr.net/dashboard'`
 	echo "${dashboard}" | grep 'name="chk_rememberme"' > /dev/null && errExit "ip update has failed, we seemed to have been kicked out"
-	echo "${dashboard}" | grep '/dashboard/change_ip' && errExit "ip update has failed"
+	echo "${dashboard}" | grep '/dashboard/change_ip'  > /dev/null && errExit "ip update has failed"
 	[ `echo "${dashboard}" | grep 'fa-check-square-o' | grep -Eoi 'Active|Valid' | wc -w` -lt 5 ] && errExit 'Check the tunlr dashboard, something is wrong'
 	msgLog "Ip address has been updated, everything is ok!"
 else
