@@ -115,6 +115,15 @@ if [ "${insecure}" = "1" ]; then
 	wOpt="${wOpt} --no-check-certificate"
 	cOpt="${cOpt} --insecure"
 fi
+msgLog "Getting tunlr status page"
+statusP=`gPage "http://tunlr.net/status/" | tr '\n' ' '`
+[ -z "${statusP}" ] && errExit "Getting the status page has failed"
+echo "${statusP}" | grep -i 'update your IP address' > /dev/null
+if [ $? -ne 0 ]; then
+	msgLog "Nothing to update, everything is ok!"
+	exit 0
+fi
+
 msgLog "Getting gatekeeper cookies and form_token"
 form=`gPage 'https://gatekeeper.tunlr.net' | sed -n '/<form/,/<\/form/p' | tr '\n' ' '`
 [ -z "${form}" ] && errExit "Failed to retrieve the login form data"
