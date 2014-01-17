@@ -120,6 +120,7 @@ statusP=`gPage "http://tunlr.net/status/" | tr '\n' ' '`
 [ -z "${statusP}" ] && errExit "Getting the status page has failed"
 echo "${statusP}" | grep -i 'update your IP address' > /dev/null
 if [ $? -ne 0 ]; then
+	echo ""
 	msgLog "Nothing to update, everything is ok!"
 	exit 0
 fi
@@ -155,5 +156,5 @@ if [ $? -eq 0 ]; then
 	msgLog "Ip address has been updated, everything is ok!"
 else
 	echo ""
-	msgLog "Nothing to update, everything is ok!"
+	errExit "Updating has failed, check the tunlr dashboard"
 fi
