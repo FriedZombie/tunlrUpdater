@@ -24,9 +24,9 @@ logCmd=''			#specify the commant to pipe the log messages to, e.g. logger
 #function to echo to stderr and exit the script
 errExit() {
 	if [ -z "${logCmdErr}" ]; then
-		echo "${1}" 1>&2
+		echo "\033[31m${1}\033[0m" 1>&2
 	else
-		echo "${1}"
+		echo "\033[31m${1}\033[0m"
 		echo "${1}" | ${logCmdErr}
 	fi
 	exit 1
@@ -34,7 +34,7 @@ errExit() {
 
 #function to log messages
 msgLog() {
-	echo "${1}"
+	echo "\033[32m${1}\033[0m"
 	[ -z "${logCmd}" ] || echo "${1}" | ${logCmd}
 }
 
