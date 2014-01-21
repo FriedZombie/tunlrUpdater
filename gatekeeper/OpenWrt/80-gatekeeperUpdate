@@ -20,7 +20,11 @@ if [ "$ACTION" = "ifup" ] && [ "$INTERFACE" = "${netIface}" ]; then
 			echo "${ip}" | grep -E '^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.)' > /dev/null && wanC=0 || wanC=1
 			if [ $wanC -eq 1 ]; then
 				touch "${ipFile}"
-				grep "${ip}" "${ipFile}" > /dev/null && return 0
+				grep "${ip}" "${ipFile}" > /dev/null
+				if [ $? -eq 0 ]; then
+					rm "${lockFile}"
+					return 0
+				fi
 			fi
 			/sbin/gatekeeperUpdate && {
 				[ $wanC -eq 1 ] && echo "${ip}" > "${ipFile}"
