@@ -1,14 +1,41 @@
 #!/usr/bin/env bash
+# If you get the message:
+# /usr/bin/env: bash: No such file or directory
+# try to change bash to ash
 
+
+####################
+## -- Settings -- ##
+####################
+
+# Add your API token here from https://gatekeeper.tunlr.net/account_options
 TOKEN='insert_your_token_here'
+
+# Specify the client you want to use, the options are: curl wget
 CLIENT='wget'
+
+# Extra command line options to parse to the client.
 xOPT=''
+
+# If secure is 1 it uses https and if set to 0 it uses http
 SECURE=0
+
+# Agent string to send to the webserver
 AGENT='update-script v2'
-API='api_v1'
+
+# Specify the verbosity to use:
+# 1 Only show the error messages
+# 2 Show error and warning messages
+# 3 show error, warning and log messages
+# 4 show error, warning, log and client transaction messages
 VERBOSE=3
+
+# Days left on a subscription before a warning message is shown
 dWARN=7
 
+####################
+## -- messages -- ##
+####################
 messages() {
 	case "$1" in
 	  'invalid_token'      ) logErr "Your token is not valid, check your tunlr dashboard";;
@@ -42,11 +69,15 @@ messages() {
 	  'json/exp4'          ) logErr "json: EXPECTED , or } GOT $2";;
 	  'json/exp5'          ) logErr "json: EXPECTED value GOT $2";;
 	  'json/exp6'          ) logErr "json: EXPECTED EOF GOT $2";;
-	  *'false'|*'true'     ) ;;
-	  *                    ) logWrn "Unkown: $*";;
+	  *'false'|*'true'     ) ;; # don't output anything on false or true
+	  *                    ) logWrn "Unkown: $*";; #unkown message handler
         esac
 }
 
+
+##############################
+## -- Script starts here -- ##
+##############################
 logErr () {
   [ $VERBOSE -ge 1 ] && echo "  $esc[31m$*$esc[0m" >&2
   echo
@@ -256,4 +287,5 @@ tunlrUpdate() {
 	echo
 }
 
+API='api_v1'
 tunlrUpdate
