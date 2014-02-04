@@ -3,7 +3,6 @@
 # /usr/bin/env: bash: No such file or directory
 # try to change bash to ash
 
-
 ####################
 ## -- Settings -- ##
 ####################
@@ -16,6 +15,18 @@ CLIENT='wget'
 
 # Extra command line options to parse to the client.
 xOPT=''
+
+# Set to 0 to not log to console
+LOGCONSOLE=1
+
+# Secify the command to pipe the log messages to, e.g. logger
+cmdLog=''
+
+# Secify the command to pipe the warning messages to, e.g. logger
+cmdWrn=''
+
+# Secify the command to pipe the error messages to, e.g. logger
+cmdErr=''
 
 # If secure is 1 it uses https and if set to 0 it uses http
 SECURE=0
@@ -79,17 +90,26 @@ messages() {
 ## -- Script starts here -- ##
 ##############################
 logErr () {
-  [ $VERBOSE -ge 1 ] && echo "  $esc[31m$*$esc[0m" >&2
+  if [ "$VERBOSE" -ge 1 ]; then
+    [ "$LOGCONSOLE" != '0' ] && echo "  $esc[31m$*$esc[0m" >&2
+    [ -n "${cmdErr}" ] && echo "$*" | ${cmdErr}
+  fi
   echo
   exit 1
 }
 
 logWrn () {
-  [ $VERBOSE -ge 2 ] && echo "  $esc[31m$*$esc[0m" >&2
+  if [ "$VERBOSE" -ge 2 ]; then
+    [ "$LOGCONSOLE" != '0' ] && echo "  $esc[31m$*$esc[0m" >&2
+    [ -n "${cmdWrn}" ] && echo "$*" | ${cmdWrn}
+  fi
 }
 
 logMsg () {
-  [ $VERBOSE -ge 3 ] && echo "  $esc[32m$*$esc[0m" >&2
+  if [ "$VERBOSE" -ge 3 ]; then
+    [ "$LOGCONSOLE" != '0' ] && echo "  $esc[32m$*$esc[0m" >&2
+    [ -n "${cmdMsg}" ] && echo "$*" | ${cmdMsg}
+  fi
 }
 
 awk_egrep () {
@@ -248,11 +268,12 @@ tunlrUpdate() {
 
 	echo
 	fields=`tunlrApi get_account` || exit 1
-	[ "$(getField '"success"')" != "true" ] && messages 'no_account'
-	messages "state/$(getField '"account","state"')"
 
 	message=`getField '"message"'`
 	messages "$message"
+
+	[ "$(getField '"success"')" != "true" ] && messages 'no_account'
+	messages "state/$(getField '"account","state"')"
 
 	plan=`getField '"subscription","plan_name"'`
 	[ "$plan" = "false" ] && messages 'state/expired'
