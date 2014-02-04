@@ -1,160 +1,259 @@
-#!/bin/sh
+#!/usr/bin/env bash
 
-####################
-## -- Settings -- ##
-####################
+TOKEN='insert_your_token_here'
+CLIENT='wget'
+xOPT=''
+SECURE=0
+AGENT='update-script v2'
+API='api_v1'
+VERBOSE=3
+dWARN=7
 
-user='user@example.com'		#user name to login into gatekeeper
-password='pass12345'		#password to login into gatekeeper
-
-client='wget'			#client to use, options: curl wget
-agent='update-script'		#user agent string send to the server
-cookie='/tmp/tunlr-cookie.txt'	#create cookie jar
-insecure=1			#set insecure=1 to skip the cert validity check
-wOpt=''				#extra options for wget
-cOpt=''				#extra options for curl
-logCmdErr=''			#specify the command to pipe the error messages to, e.g. logger
-logCmd=''			#specify the commant to pipe the log messages to, e.g. logger
-
-
-#############################
-## -- Script start here -- ##
-#############################
-
-#function to echo to stderr and exit the script
-errExit() {
-	if [ -z "${logCmdErr}" ]; then
-		echo "[31m${1}[0m" 1>&2
-	else
-		echo "[31m${1}[0m"
-		echo "${1}" | ${logCmdErr}
-	fi
-	exit 1
+messages() {
+	case "$1" in
+	  'invalid_token'      ) logErr "Your token is not valid, check your tunlr dashboard";;
+	  'api_access_disabled') logErr "API access disabled, check your tunlr dashboard";;
+	  'days_remaining_w'   ) logWrn "$2 days remaining on your $3 subscription plan";;
+	  'days_remaining'     ) logMsg "$2 days remaining on your $3 subscription plan";; 
+	  'up_for_renewal'     ) logWrn "Your account is up for renewal, please check your tunlr dashboard";;
+	  'as/hosting'         ) logWrn "ISP-enforced transparent proxy, a VPN provider or a server provider has been detected";;
+	  'as/abuse'           ) logWrn "Autonomous system is banned";;
+	  'cidr/hosting'       ) logWrn "Network range belongs to a VPN or server provider";;
+	  'cidr/abuse'         ) logWrn "Network range is banned";;
+	  'proxy'              ) logWrn "A proxy has been detected";;
+	  'no_ip_change'       ) logMsg "Your ip has not changed";;
+	  'ip_change'	       ) logWrn "Your ip has changed";;
+	  'state/expired'      ) logErr "There is currently no subscription plan, please check your tunlr dashboard";;
+	  'state/active'       ) logMsg "Account is active";;
+	  'state/banned'       ) logErr "Account is banned";;
+	  'state/pending'      ) logErr "Account is pending, check your tunlr dashboard";;
+	  'no_account'         ) logErr "Failed to get account info";;
+	  'update/fail'        ) logErr "Failed to update ip address";;
+	  'update/block'       ) logErr "Your current ip is blacklisted by tunlr";;
+	  'update/none'        ) logWrn "Nothing to update";;
+	  'update/done'        ) logWrn "Ip has been updated";;
+	  'api/client'         ) logErr "wrong client selected, options are wget or curl";;
+	  'api/get'            ) logMsg "Getting the json respone from ${2}TOKEN-redacted";;
+	  'api/noConnect'      ) logErr "$2 failed to connect";;
+	  'api/empty'          ) logErr "tunlr API returned an empty page";;
+	  'json/exp1'          ) logErr "json: EXPECTED , or ] GOT $2";;
+	  'json/exp2'          ) logErr "json: EXPECTED string GOT $2";;
+	  'json/exp3'          ) logErr "json: EXPECTED : GOT $2";;
+	  'json/exp4'          ) logErr "json: EXPECTED , or } GOT $2";;
+	  'json/exp5'          ) logErr "json: EXPECTED value GOT $2";;
+	  'json/exp6'          ) logErr "json: EXPECTED EOF GOT $2";;
+	  *'false'|*'true'     ) ;;
+	  *                    ) logWrn "Unkown: $*";;
+        esac
 }
 
-#function to log messages
-msgLog() {
-	echo "[32m${1}[0m"
-	[ -z "${logCmd}" ] || echo "${1}" | ${logCmd}
+logErr () {
+  [ $VERBOSE -ge 1 ] && echo "  $esc[31m$*$esc[0m" >&2
+  echo
+  exit 1
 }
 
-#function to url encode for those pesky secure passwords :P
-enc() {
-	echo "${1}" | sed \
-	  -e 's/%/%25/g' -e 's/ /%20/g' -e 's/!/%21/g' -e 's/"/%22/g' -e 's/#/%23/g' \
-	  -e 's/\$/%24/g' -e 's/\&/%26/g' -e 's/'\''/%27/g' -e 's/(/%28/g' -e 's/)/%29/g' \
-	  -e 's/\*/%2a/g' -e 's/+/%2b/g' -e 's/,/%2c/g' -e 's/-/%2d/g' -e 's/\./%2e/g' \
-	  -e 's/\//%2f/g' -e 's/:/%3a/g' -e 's/;/%3b/g' -e 's//%3e/g' -e 's/?/%3f/g' \
-	  -e 's/@/%40/g' -e 's/\[/%5b/g' -e 's/\\/%5c/g' -e 's/\]/%5d/g' -e 's/\^/%5e/g' \
-	  -e 's/_/%5f/g' -e 's/`/%60/g' -e 's/{/%7b/g' -e 's/|/%7c/g' -e 's/}/%7d/g' -e 's/~/%7e/g'
+logWrn () {
+  [ $VERBOSE -ge 2 ] && echo "  $esc[31m$*$esc[0m" >&2
 }
 
-#function to get the needed web pages
-gPage() {
-	if [ "$client" = "wget" ]; then
-		case $# in
-		  3)
-			wget ${wOpt} --load-cookies "${cookie}" --save-cookies "${cookie}" --keep-session-cookies \
-			  --user-agent "${agent}" --referer "${2}" --post-data "${3}" -O - "${1}"
-			ex=$?
-		  ;;
-		  2)
-			wget ${wOpt} --load-cookies "${cookie}" --save-cookies "${cookie}" \
-			  --keep-session-cookies --user-agent "${agent}" --referer "${2}" -O - "${1}"
-			ex=$?
-		  ;;
-		  *)
-			wget ${wOpt} --load-cookies "${cookie}" --save-cookies "${cookie}" \
-			  --keep-session-cookies --user-agent "${agent}" -O - "${1}"
-			ex=$?
+logMsg () {
+  [ $VERBOSE -ge 3 ] && echo "  $esc[32m$*$esc[0m" >&2
+}
+
+awk_egrep () {
+  local pattern_string=$1
+  gawk '{
+    while ($0) {
+      start=match($0, pattern);
+      token=substr($0, start, RLENGTH);
+      print token;
+      $0=substr($0, start+RLENGTH);
+    }
+  }' pattern=$pattern_string
+}
+
+tokenize () {
+  local GREP
+  local ESCAPE
+  local CHAR
+
+  if echo "test string" | egrep -ao --color=never "test" &>/dev/null
+  then
+    GREP='egrep -ao --color=never'
+  else
+    GREP='egrep -ao'
+  fi
+
+  if echo "test string" | egrep -o "test" &>/dev/null
+  then
+    ESCAPE='(\\[^u[:cntrl:]]|\\u[0-9a-fA-F]{4})'
+    CHAR='[^[:cntrl:]"\\]'
+  else
+    GREP=awk_egrep
+    ESCAPE='(\\\\[^u[:cntrl:]]|\\u[0-9a-fA-F]{4})'
+    CHAR='[^[:cntrl:]"\\\\]'
+  fi
+
+  local STRING="\"$CHAR*($ESCAPE$CHAR*)*\""
+  local NUMBER='-?(0|[1-9][0-9]*)([.][0-9]*)?([eE][+-]?[0-9]*)?'
+  local KEYWORD='null|false|true'
+  local SPACE='[[:space:]]+'
+
+  $GREP "$STRING|$NUMBER|$KEYWORD|$SPACE|." | egrep -v "^$SPACE$"
+}
+
+parse_array () {
+  local index=0
+  local ary=''
+  read -r token
+  case "$token" in
+    ']') ;;
+    *)
+      while :
+      do
+        parse_value "$1" "$index"
+        index=$((index+1))
+        ary="$ary""$value" 
+        read -r token
+        case "$token" in
+          ']') break ;;
+          ',') ary="$ary," ;;
+          *) messages 'json/exp1' "${token:-EOF}";;
+        esac
+        read -r token
+      done
+      ;;
+  esac
+  :
+}
+
+parse_object () {
+  local key
+  local obj=''
+  read -r token
+  case "$token" in
+    '}') ;;
+    *)
+      while :
+      do
+        case "$token" in
+          '"'*'"') key=$token ;;
+          *) messages 'json/exp2' "${token:-EOF}" "EXPECTED string GOT ${token:-EOF}" ;;
+        esac
+        read -r token
+        case "$token" in
+          ':') ;;
+          *) messages 'json/exp3' "${token:-EOF}" ;;
+        esac
+        read -r token
+        parse_value "$1" "$key"
+        obj="$obj$key:$value"        
+        read -r token
+        case "$token" in
+          '}') break ;;
+          ',') obj="$obj," ;;
+          *) messages 'json/exp4' "${token:-EOF}" ;;
+        esac
+        read -r token
+      done
+    ;;
+  esac
+  :
+}
+
+parse_value () {
+  local jpath="${1:+$1,}$2" isleaf=0 isempty=0
+  case "$token" in
+    '{') parse_object "$jpath" ;;
+    '[') parse_array  "$jpath" ;;
+    ''|[!0-9]) messages 'json/exp5' "${token:-EOF}" ;;
+    *) value=$token
+       isleaf=1
+       [ "$value" = '""' ] && isempty=1
+       ;;
+  esac
+  [ "$value" = '' ] && return
+  [ "$isleaf" -eq 1 ] && printf "[%s]\t%s\n" "$jpath" "$value"
+  :
+}
+
+parse () {
+  read -r token
+  parse_value
+  read -r token
+  case "$token" in
+    '') ;;
+    *) messages 'json/exp6' "$token" ;;
+  esac
+}
+
+getField() {
+	echo "$fields" | grep "\[${1}\]" |
+	  sed 's/.*\t//;s/^"//;s/"$//;s/^null$/false/;s/^$/false/'
+}
+
+tunlrApi() {
+	local url='' json=''
+	[ "$SECURE" = '1' ] && url='https' || url='http'
+        url="$url://gatekeeper-api.tunlr.net/$API/$1/"
+	messages 'api/get' "$url"
+	url="${url}${TOKEN}"
+	json=`{
+		[ "$VERBOSE" -ge 4 ] || exec 2>/dev/null
+		case "${CLIENT}" in
+		  wget) wget -O - --user-agent "${AGENT}" ${xOPT} "$url" ;;
+		  curl) curl --fail --user-agent "${AGENT}" ${xOPT} "$url" ;;
+		  *) messages 'api/client' ;;
 		esac
-	else
-		case $# in
-		  3)
-			curl ${cOpt} --cookie "${cookie}" --cookie-jar "${cookie}" --location \
-			  --user-agent "${agent}" --referer "${2}" --data "${3}" "${1}"
-			ex=$?
-		  ;;
-		  2)
-			curl ${cOpt} --cookie "${cookie}" --cookie-jar "${cookie}" --location \
-			  --user-agent "${agent}" --referer "${2}" "${1}"
-			ex=$?
-		  ;;
-		  *)
-			curl ${cOpt} --cookie "${cookie}" --cookie-jar "${cookie}" --location \
-			  --user-agent "${agent}" "${1}"
-			ex=$?
-		esac
-
-	fi
-	[ $ex -ne 0 ] && errExit "Getting the page has failed"
-	[ -s "${cookie}" ] || errExit "Cookies not stored, check script settings"
-	return 0
+	}` || messages 'api/noConnect' "${CLIENT}"
+	[ -z "$json" ] && messages 'api/empty'
+	echo "${json}" | tokenize | parse
 }
 
-# Test if we have wget and see if we have a useable one
-case $client in
-  "wget")
-	wgetInfo=`wget --no-check-certificate 2>&1`
-	[ $? -eq 127 ] && errExit "wget seems to be missing"
-	echo "${wgetInfo}" | grep 'BusyBox' > /dev/null && errExit "wget provided by BusyBox isn't sufficient"
-	echo "${wgetInfo}" | grep 'unrecognized option' > /dev/null && errExit "wget is compiled without HTTPS support"
-  ;;
-  "curl")
-	curlInfo=`curl --version`
-	[ $? -eq 127 ] && errExit "curl seems to be missing"
-	echo "${curlInfo}" | grep 'https' > /dev/null || errExit "curl is compiled without HTTPS support"
-	echo "${curlInfo}" | grep 'zlib'> /dev/null && cOpt="${cOpt} --compressed"
-  ;;
-  *)
-	errExit "Incorrect client specified in script"
-esac
+tunlrUpdate() {
+	local fields message plan days ipChange esc
+	esc="$(echo | tr '\n' '\033')"
 
-#openwrt doesn't have certs installed by default, hence the insecure option
-if [ "${insecure}" = "1" ]; then
-	wOpt="${wOpt} --no-check-certificate"
-	cOpt="${cOpt} --insecure"
-fi
-msgLog "Getting tunlr status page"
-statusP=`gPage "http://tunlr.net/status/" | tr '\n' ' '`
-[ -z "${statusP}" ] && errExit "Getting the status page has failed"
-echo "${statusP}" | grep -i 'update your IP address' > /dev/null
-if [ $? -ne 0 ]; then
-	echo ""
-	msgLog "Nothing to update, everything is ok!"
-	exit 0
-fi
+	echo
+	fields=`tunlrApi get_account` || exit 1
+	[ "$(getField '"success"')" != "true" ] && messages 'no_account'
+	messages "state/$(getField '"account","state"')"
 
-msgLog "Getting gatekeeper cookies and form_token"
-form=`gPage 'https://gatekeeper.tunlr.net' | sed -n '/<form/,/<\/form/p' | tr '\n' ' '`
-[ -z "${form}" ] && errExit "Failed to retrieve the login form data"
+	message=`getField '"message"'`
+	messages "$message"
 
-form_token=`echo "${form}" | sed 's/.*form_token" value\="//;s/".*//'`
-[ -z "${form_token}" ] && errExit "failed to retrieve the login form_token"
+	plan=`getField '"subscription","plan_name"'`
+	[ "$plan" = "false" ] && messages 'state/expired'
 
-msgLog "Sending credentials to the gatekeeper login"
-dashboard=`gPage "https://gatekeeper.tunlr.net/login" \
-  "https://gatekeeper.tunlr.net" \
-  "form_token=$(enc "${form_token}")&usermail=$(enc "${user}")&password=$(enc "${password}")"`
+	days=`getField '"subscription","days_remaining"'`
+	[ "$days" != 'false' ] && [ "$days" -le "$dWARN" ] &&
+	  messages 'days_remaining_w' "$days" "$plan" ||
+	  messages 'days_remaining' "$days" "$plan"
 
-[ -z "${dashboard}" ] && errExit 'gatekeeper returned an empty page'
-echo "${dashboard}" | grep -i 'password is incorrect' > /dev/null && errExit 'Your username/email or password is incorrect'
-echo "${dashboard}" | grep    'name="chk_rememberme"' > /dev/null && errExit 'failed to login, credentials seems to be correct though'
-echo "${dashboard}" | grep -i 'Account number' > /dev/null || errExit 'Failed to get the dashboard page'
+	[ "$(getField '"subscription","up_for_renewal"')" = 'true' ] && messages 'up_for_renewal'
 
-msgLog "Login successful, checking the current status"
-[ `echo "${dashboard}" | grep 'fa-check-square-o' | grep -Eoi 'Active|Valid' | wc -w` -lt 5 ] && errExit "Check the tunlr dashboard, something is wrong"
+	ipChange=`getField '"subscription","has_ip_changed"'`
+	case "$ipChange" in
+	  false) messages 'no_ip_change';;
+	  true ) messages 'ip_change';;
+	  *    ) messages "$ipChange";;
+	esac
 
-echo "${dashboard}" | grep '/dashboard/change_ip' > /dev/null
-if [ $? -eq 0 ]; then
-	msgLog "ip has changed, going to update"
-	echo ""
-	dashboard=`gPage 'https://gatekeeper.tunlr.net/dashboard/change_ip' 'https://gatekeeper.tunlr.net/dashboard'`
-	echo "${dashboard}" | grep 'name="chk_rememberme"' > /dev/null && errExit "ip update has failed, we seemed to have been kicked out"
-	echo "${dashboard}" | grep '/dashboard/change_ip'  > /dev/null && errExit "ip update has failed"
-	[ `echo "${dashboard}" | grep 'fa-check-square-o' | grep -Eoi 'Active|Valid' | wc -w` -lt 5 ] && errExit 'Check the tunlr dashboard, something is wrong'
-	msgLog "Ip address has been updated, everything is ok!"
-else
-	echo ""
-	errExit "Updating has failed, check the tunlr dashboard"
-fi
+	case "$message" in
+	  *hosting | *abuse | *proxy) messages 'update/block';;
+	esac
+
+	if [ "$ipChange" = false ]; then
+		messages 'update/none'
+		echo ""
+		exit 0
+	fi
+	fields=`tunlrApi update_ip` || exit 1
+	message=`getField '"message"'`
+	messages "$message"
+	[ "$(getField '"success"')" != "true" ] && messages 'update/fail' || messages 'update/done'
+	echo
+}
+
+tunlrUpdate
