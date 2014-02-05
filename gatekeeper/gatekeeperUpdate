@@ -1,9 +1,8 @@
 #!/usr/bin/env sh
 # The script works under ash and bash decide wich to use
-{ echo true | /usr/bin/env ash 2>/dev/null  && shebang='/usr/bin/env ash'; }  ||
-{ echo true | /usr/bin/env bash 2>/dev/null && shebang='/usr/bin/env bash'; } ||
-{ echo 'bash or ash not found' >&2; exit 1; }
-$shebang <<'EOF'
+`{ echo true | /usr/bin/env ash 2>/dev/null && echo '/usr/bin/env ash'; }  ||
+{ echo true | /usr/bin/env bash 2>/dev/null && echo '/usr/bin/env bash'; } ||
+{ echo 'bash or ash not found' >&2; exit 1; }` <<'EOF'
 
 ####################
 ## -- Settings -- ##
