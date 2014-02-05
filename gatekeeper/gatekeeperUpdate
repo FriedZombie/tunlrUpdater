@@ -1,7 +1,4 @@
-#!/usr/bin/env bash
-# If you get the message:
-# /usr/bin/env: bash: No such file or directory
-# try to change bash to ash
+# no shebang because it can run with ash and bash
 
 ####################
 ## -- Settings -- ##
