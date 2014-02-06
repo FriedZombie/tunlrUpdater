@@ -280,9 +280,11 @@ tunlrUpdate() {
 	[ "$plan" = "false" ] && messages 'state/expired'
 
 	days=`getField '"subscription","days_remaining"'`
-	[ "$days" != 'false' ] && [ "$days" -le "$dWARN" ] &&
-	  messages 'days_remaining_w' "$days" "$plan" ||
-	  messages 'days_remaining' "$days" "$plan"
+	if [ "$days" != 'false' ] && [ "$days" -le "$dWARN" ]; then
+		messages 'days_remaining_w' "$days" "$plan"
+	else
+		messages 'days_remaining' "$days" "$plan"
+	fi
 
 	[ "$(getField '"subscription","up_for_renewal"')" = 'true' ] && messages 'up_for_renewal'
 
