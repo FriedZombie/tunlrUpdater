@@ -254,7 +254,7 @@ tunlrApi() {
 	json=`{
 		[ "$VERBOSE" -ge 4 ] || exec 2>/dev/null
 		case "${CLIENT}" in
-		  wget) wget -O - --user-agent "${AGENT}" ${xOPT} "$url" ;;
+		  wget) wget -O - -U "${AGENT}" ${xOPT} "$url" ;;
 		  curl) curl --fail --user-agent "${AGENT}" ${xOPT} "$url" ;;
 		  *) messages 'api/client' ;;
 		esac
