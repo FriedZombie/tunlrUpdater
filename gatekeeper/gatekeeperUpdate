@@ -1,4 +1,7 @@
 #!/usr/bin/env sh
+
+#tunlr has pulled the plug, this script isn't working anymore.
+
 # The script works under ash and bash decide wich to use
 `{ echo true | /usr/bin/env ash 2>/dev/null && echo '/usr/bin/env ash'; }  ||
 { echo true | /usr/bin/env bash 2>/dev/null && echo '/usr/bin/env bash'; } ||
